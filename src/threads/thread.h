@@ -90,6 +90,8 @@ struct thread
    int priority;              /* Priority. */
    struct list_elem allelem;  /* List element for all threads list. */
 
+   struct list_elem cond_elem;
+
    int virtual_priority;
 
    // struct list donations; /* Keeps track of all donations to this thread */

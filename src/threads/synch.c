@@ -73,10 +73,9 @@ sema_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *a
 
 bool
 cond_priority_cmp (const struct list_elem *a, const struct list_elem *b, void *aux) {
-    struct semaphore_elem *sem1 = list_entry(a, struct semaphore_elem, elem);
-    struct semaphore_elem *sem2 = list_entry(b, struct semaphore_elem, elem);
-    return list_entry(list_front(&sem1->semaphore.waiters), struct thread, elem)->priority  > \
-    list_entry(list_front(&sem2->semaphore.waiters), struct thread, elem)->priority ;
+    struct thread *thread1 = list_entry(a, struct thread, cond_elem);
+    struct thread *thread2 = list_entry(b, struct thread, cond_elem);
+    return thread1->virtual_priority > thread2->virtual_priority;
 }
 
 void
@@ -377,12 +376,17 @@ cond_wait (struct condition *cond, struct lock *lock)
   ASSERT (lock != NULL);
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
-  
-  sema_init (&waiter.semaphore, 0);
-  list_insert_ordered(&cond->waiters, &waiter.elem, &sema_priority_cmp, NULL);
-  lock_release (lock);
-  sema_down (&waiter.semaphore);
-  lock_acquire (lock);
+
+
+
+    enum intr_level old_level = intr_disable ();
+
+    list_insert_ordered(&cond->waiters, &thread_current()->cond_elem, &cond_priority_cmp , NULL);
+    lock_release (lock);
+
+    thread_block ();
+    lock_acquire (lock);
+    intr_set_level (old_level);
 }
 
 /* If any threads are waiting on COND (protected by LOCK), then
@@ -400,11 +404,14 @@ cond_signal (struct condition *cond, struct lock *lock UNUSED)
   ASSERT (!intr_context ());
   ASSERT (lock_held_by_current_thread (lock));
 
-  if (!list_empty (&cond->waiters)) {
-      list_sort(&cond->waiters, &sema_priority_cmp, NULL);
-      sema_up (&list_entry (list_pop_front (&cond->waiters),
-      struct semaphore_elem, elem)->semaphore);
-  }
+    enum intr_level old_level = intr_disable ();
+    if (!list_empty (&cond->waiters)) {
+        thread_unblock (list_entry (list_pop_front (&cond->waiters),
+        struct thread, cond_elem));
+    }
+
+    thread_yield ();
+    intr_set_level (old_level);
 
 
 }
