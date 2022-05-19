@@ -1,9 +1,4 @@
 
-#define DEBUG true
-
-
-
-
 /* This file is derived from source code for the Nachos
    instructional operating system.  The Nachos copyright notice
    is reproduced in full below. */
@@ -143,7 +138,6 @@ sema_up (struct semaphore *sema)
   sema->value++;
   intr_set_level (old_level);
   if (!intr_context()) thread_yield();
-
 
 }
 

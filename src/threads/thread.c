@@ -57,6 +57,7 @@ static unsigned thread_ticks;   /* # of timer ticks since last yield. */
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
+
 bool thread_mlfqs;
 
 static void kernel_thread (thread_func *, void *aux);
@@ -70,6 +71,9 @@ static void *alloc_frame (struct thread *, size_t size);
 static void schedule (void);
 void thread_schedule_tail (struct thread *prev);
 static tid_t allocate_tid (void);
+
+/* MLFQ */
+fixed_t load_avg;
 
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
@@ -93,7 +97,10 @@ thread_init (void)
   list_init (&ready_list);
   list_init (&all_list);
 
-  /* Set up a thread structure for the running thread. */
+  load_avg = FP_CONST(0); /* Load Average initialized to 0 at boot time */
+
+
+    /* Set up a thread structure for the running thread. */
   initial_thread = running_thread ();
   init_thread (initial_thread, "main", PRI_DEFAULT);
   initial_thread->status = THREAD_RUNNING;
@@ -137,6 +144,29 @@ thread_tick (void)
   /* Enforce preemption. */
   if (++thread_ticks >= TIME_SLICE)
     intr_yield_on_return ();
+}
+
+/* MLFQ Functions */
+
+void update_mlfqs_priority(struct thread *t){
+    t->priority = FP_INT_PART (FP_SUB_MIX (FP_SUB (FP_CONST (PRI_MAX), FP_DIV_MIX (t->recent_cpu, 4)), 2 * t->nice));
+    if (t->priority < PRI_MIN)
+        t->priority = PRI_MIN;
+    else if (t->priority > PRI_MAX)
+        t->priority = PRI_MAX;
+}
+
+void update_mlfqs_values(){
+    size_t ready_list_size = list_size(&ready_list);
+    load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX(FP_CONST(ready_list_size), 60));
+    struct thread *t;
+    struct list_elem *elem;
+    for (elem = list_begin(&all_list); elem != list_end(&all_list); elem = list_next(elem))
+    {
+        t = list_entry(elem, struct thread, allelem);
+        t->recent_cpu = FP_ADD_MIX (FP_MULT (FP_DIV (FP_MULT_MIX (load_avg, 2), FP_ADD_MIX (FP_MULT_MIX (load_avg, 2), 1)), t->recent_cpu), t->nice);
+        update_mlfqs_priority(t);
+    }
 }
 
 /* Prints thread statistics. */
@@ -320,8 +350,10 @@ thread_yield (void)
   ASSERT (!intr_context ());
 
   old_level = intr_disable ();
-  if (cur != idle_thread) 
-    list_insert_ordered(&ready_list, &cur->elem, &thread_priority_cmp, NULL);
+  if (cur != idle_thread)
+    list_push_back(&ready_list, &cur->elem);
+    list_sort(&ready_list, &thread_priority_cmp, NULL);
+//    list_insert_ordered(&ready_list, &cur->elem, &thread_priority_cmp, NULL);
 
   cur->status = THREAD_READY;
   schedule ();
@@ -349,6 +381,11 @@ thread_foreach (thread_action_func *func, void *aux)
 void
 thread_set_priority (int new_priority) 
 {
+
+  if (thread_mlfqs){
+      return;
+  }
+
   int old_priority = thread_current()->priority;
   if (new_priority > thread_current()->virtual_priority)
     thread_current ()->virtual_priority = new_priority;
@@ -369,31 +406,28 @@ thread_get_priority (void)
 void
 thread_set_nice (int nice UNUSED) 
 {
-  /* Not yet implemented. */
+   thread_current()->nice = nice;
 }
 
 /* Returns the current thread's nice value. */
 int
 thread_get_nice (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return thread_current()->nice;
 }
 
 /* Returns 100 times the system load average. */
 int
 thread_get_load_avg (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return FP_ROUND (FP_MULT_MIX (load_avg, 100));
 }
 
 /* Returns 100 times the current thread's recent_cpu value. */
 int
 thread_get_recent_cpu (void) 
 {
-  /* Not yet implemented. */
-  return 0;
+  return FP_ROUND (FP_MULT_MIX (thread_current()->recent_cpu, 100));
 }
 
 /* Idle thread.  Executes when no other thread is ready to run.
@@ -487,6 +521,12 @@ init_thread (struct thread *t, const char *name, int priority)
   t->virtual_priority = priority;
   list_init(&t->locks);
   t->waiting_lock = NULL;
+
+  /* MLFQ */
+  t->nice = 0;
+  t->recent_cpu = FP_CONST (0);
+
+
   t->magic = THREAD_MAGIC;
 
   old_level = intr_disable ();

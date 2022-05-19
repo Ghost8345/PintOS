@@ -219,7 +219,20 @@ timer_interrupt (struct intr_frame *args UNUSED)
     break;
   }
   thread_tick ();
+
+  /* MLFQ */
+
+  if (thread_mlfqs){
+    thread_current()->recent_cpu = FP_ADD_MIX(thread_current()->recent_cpu, 1);
+    if (ticks % TIMER_FREQ == 0){
+        update_mlfqs_values();
+    }
+    else if (ticks % 4 == 0){
+        update_mlfqs_priority(thread_current());
+    }
+  }
 }
+
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */
