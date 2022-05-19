@@ -149,6 +149,10 @@ thread_tick (void)
 /* MLFQ Functions */
 
 void update_mlfqs_priority(struct thread *t){
+
+    if (t == idle_thread)
+        return;
+
     t->priority = FP_INT_PART (FP_SUB_MIX (FP_SUB (FP_CONST (PRI_MAX), FP_DIV_MIX (t->recent_cpu, 4)), 2 * t->nice));
     if (t->priority < PRI_MIN)
         t->priority = PRI_MIN;
@@ -157,16 +161,30 @@ void update_mlfqs_priority(struct thread *t){
 }
 
 void update_mlfqs_values(){
+
     size_t ready_list_size = list_size(&ready_list);
+
+    if (thread_current() != idle_thread)
+        ready_list_size++;
+
     load_avg = FP_ADD (FP_DIV_MIX (FP_MULT_MIX (load_avg, 59), 60), FP_DIV_MIX(FP_CONST(ready_list_size), 60));
     struct thread *t;
     struct list_elem *elem;
     for (elem = list_begin(&all_list); elem != list_end(&all_list); elem = list_next(elem))
     {
         t = list_entry(elem, struct thread, allelem);
+        if (t == idle_thread)
+            continue;
         t->recent_cpu = FP_ADD_MIX (FP_MULT (FP_DIV (FP_MULT_MIX (load_avg, 2), FP_ADD_MIX (FP_MULT_MIX (load_avg, 2), 1)), t->recent_cpu), t->nice);
         update_mlfqs_priority(t);
     }
+}
+
+void mlfqs_inc_recent_cpu(){
+
+    if (thread_current() == idle_thread)
+        return;
+    thread_current()->recent_cpu = FP_ADD_MIX(thread_current()->recent_cpu, 1);
 }
 
 /* Prints thread statistics. */
@@ -414,6 +432,8 @@ int
 thread_get_nice (void) 
 {
   return thread_current()->nice;
+  update_mlfqs_priority(thread_current());
+  thread_yield();
 }
 
 /* Returns 100 times the system load average. */

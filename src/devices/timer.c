@@ -223,14 +223,15 @@ timer_interrupt (struct intr_frame *args UNUSED)
   /* MLFQ */
 
   if (thread_mlfqs){
-    thread_current()->recent_cpu = FP_ADD_MIX(thread_current()->recent_cpu, 1);
-    if (ticks % TIMER_FREQ == 0){
+      mlfqs_inc_recent_cpu();
+      if (ticks % TIMER_FREQ == 0){
         update_mlfqs_values();
     }
     else if (ticks % 4 == 0){
         update_mlfqs_priority(thread_current());
     }
   }
+
 }
 
 

@@ -158,5 +158,6 @@ int thread_get_load_avg(void);
 
 void update_mlfqs_values();
 void update_mlfqs_priority(struct thread *t);
+void inc_recent_cpu();
 
 #endif /* threads/thread.h */
