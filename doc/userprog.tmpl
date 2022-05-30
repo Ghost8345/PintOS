@@ -1,5 +1,5 @@
              +--------------------------+
-             |          CS 140          |
+             |          CSEx61          |
              | PROJECT 2: USER PROGRAMS |
              |     DESIGN DOCUMENT      |
              +--------------------------+
@@ -8,9 +8,10 @@
 
 >> Fill in the names and email addresses of your group members.
 
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
-FirstName LastName <email@domain.example>
+Ramy Fetteha <es-Ramy.EL-Sayed2024@alexu.edu.eg>
+Zyad Samy <es-ziadsami2024@alexu.edu.eg>
+AbdelMoniem Hany <es-abdelmoneim.hany2019@alexu.edu.eg>
+Youssef Saeed <es-youssef.zaki2019@alexu.edu.eg>
 
 ---- PRELIMINARIES ----
 
@@ -34,23 +35,23 @@ added the following to thread.h:
 
 struct thread
 {
-    struct list child_processe_list;
-    struct thread* parent_thread;
+    struct list child_processes_list;
+    struct thread* parent;
     bool is_child_creation_success;
     int child_status;
     struct file* executable_file;
-    struct semaphore wait_child_sema;
-    struct semaphore parent_child_sync_sema;
+    struct semaphore wait_child;
+    struct semaphore parent_child_sync;
     struct list_elem child_elem;
  }
 
- child_processe_list: list of all child processes of a thread/process.
- parent_thread: pointer to the parent thread/process.
+ child_processes_list: list of all child processes of a thread/process.
+ parent: pointer to the parent thread/process.
  is_child_creation_success: checks if the child thread/process is created successfully.
  child_status: when the parent is waiting on its child, child_status is updated with the child's exit code.
  executable_file: the current file that the process is executing.
- wait_child_sema: a semaphore used by the parent to block itself till the child finishes execution.
- parent_child_sync_sema: a semaphore used by the parent to block itself until the child process is loaded.
+ wait_child: a semaphore used by the parent to block itself till the child finishes execution.
+ parent_child_sync: a semaphore used by the parent to block itself until the child process is loaded.
  child_elem: list_elem to iterate over the thread's/process's children.
 
 ---- ALGORITHMS ----
@@ -115,7 +116,7 @@ struct open_file
 
 struct thread
 {
-    struct list open_file_list;
+    struct list opened_files_list;
     int fd_last;
 };
 
@@ -124,7 +125,7 @@ struct open_file:
     ptr: pointer to the file.
     elem: to put the struct into a list.
 
-open_file_list: is a list of opened files.
+opened_files_list: is a list of opened files.
 fd_last: is incremented when each element is added to open_file_list.
 
 
@@ -244,19 +245,63 @@ before C exits?
 - When p calls wait(c), we call sema_up(c->parent_child_sync_sema)
 and call sema_down(p->wait_child_sema).
 So the child process will start to execute and when it exits,
-it calls
- sema_up(p->wait_child_sema).
+it calls sema_up(p->wait_child_sema).
+
+After C exits?
+--------------
+- This scenario won’t happen because when the parent spawns the
+child, the child will be blocked until the parent is waiting
+for that child or the parent is terminated.
+
+
+How do you ensure that all resources are freed in each case?
+------------------------------------------------------------
+- When the process is terminated, it will iterate on
+child_processes_list to wake up all blocked children and iterate on
+open_file_list to close all opened files then it will free the memory of
+the struct holding the file.
+
+How about when P terminates without waiting, before C exits?
+------------------------------------------------------------
+- When the parent terminates, it will wake up all of its children
+and the children will execute and terminate without any
+problems.
+
+After C exits?
+--------------
+- This scenario won’t happen because when the parent spawns the
+child, the child will be blocked until the parent is waiting
+for that child or the parent is terminated.
+
+Are there any special cases?
+----------------------------
+- No, there aren’t any kind of special cases.
 
 ---- RATIONALE ----
 
 >> B9: Why did you choose to implement access to user memory from the
 >> kernel in the way that you did?
 
+- We didnt deal with user memory directly, we used functions
+  provided by PintOS to interact with user memory from the
+  kernel.
+
 >> B10: What advantages or disadvantages can you see to your design
 >> for file descriptors?
 
+-Advantages:
+    - We chose to use a simple implementation which didnt
+    include a lot of corner cases, so we weren't worried about
+    issues such as race conditions.
+- Disadvantages:
+    - Only one process can read from a file at a time.
+    - If one process reads or writes in a file, no other files
+    can be read or written
+
 >> B11: The default tid_t to pid_t mapping is the identity mapping.
 >> If you changed it, what advantages are there to your approach?
+
+We didn't change it.
 
                SURVEY QUESTIONS
                ================
@@ -270,14 +315,23 @@ the quarter.
 >> In your opinion, was this assignment, or any one of the three problems
 >> in it, too easy or too hard?  Did it take too long or too little time?
 
+The assignment was extremely hard as no sources were given, couldn't identify where to start from,
+and debugging was nearly impossible.
+
 >> Did you find that working on a particular part of the assignment gave
 >> you greater insight into some aspect of OS design?
+
+Absolutely, the course gave us more insight regarding paging, file systems, and processes.
 
 >> Is there some particular fact or hint we should give students in
 >> future quarters to help them solve the problems?  Conversely, did you
 >> find any of our guidance to be misleading?
 
+To be completely honest, the guidance was sufficient, but we struggled a bit to know which point to start from.
+
 >> Do you have any suggestions for the TAs to more effectively assist
 >> students, either for future quarters or the remaining projects?
+
+The project was well made and the resources were plenty helpful, but I think giving us a starting point would be very much appreciated.
 
 >> Any other comments?

@@ -558,9 +558,6 @@ install_page (void *upage, void *kpage, bool writable)
           && pagedir_set_page (t->pagedir, upage, kpage, writable));
 }
 
-int debug = 0 ;
-int debug_length_byte = 16 ;
-
 void
 split(char* file_name , void** esp ) {
 
@@ -595,8 +592,6 @@ split(char* file_name , void** esp ) {
         *esp-=sizeof(int);
         memcpy(*esp,&arg_address[i],sizeof(int));
     }
-
-
 
     // push pointer to the pointer of the first argument in the stack
     *esp -= sizeof(int);
