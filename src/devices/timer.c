@@ -117,10 +117,6 @@ timer_sleep (int64_t ticks)
 
   // sleep until sema signals
   sema_down(&sema);
-
-            /* Old Code */
-  // while (timer_elapsed (start) < ticks) 
-  //   thread_yield ();
 }
 
 bool 
@@ -202,12 +198,41 @@ timer_print_stats (void)
 {
   printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
+void check_sleeping_threads(void);
+
 /* Timer interrupt handler. */
 static void
 timer_interrupt (struct intr_frame *args UNUSED)
 {
   ticks++;
+  check_sleeping_threads();
+  thread_tick ();
+
+  // if MLFQ scheduling is disabled just ignore next lines and return
+  if (!thread_mlfqs) return;
+
+  // increase the recent_cpu of the currently running process by 1 in every interrupt
+  inc_recent_cpu();
+
+  bool second_passed = (ticks % TIMER_FREQ) == 0;
+  bool fourth_tick = (ticks % 4 == 0);
+
+  // TIMER_FREQ is the number of times timer_interupt gets called in a second
+  // update recent_cpu for all threads and avg_load every second
+  if (second_passed) {
+    update_load_avg();
+    update_threads_recent_cpu();
+  }
+  // priority is recalculated once in every fourth clock tick
+  if (fourth_tick) {
+    update_threads_priority_mlfqs();
+  }
+}
+
+/* Check if any sleeping thread has exceeded it's sleep time and unblock any thread that did. */
+void check_sleeping_threads(void)
+{
   while (!list_empty(&sleeping_threads)) {
     struct sleeping_thread* cur = list_entry(list_begin(&sleeping_threads), struct sleeping_thread, sleeping_elem);
 
@@ -218,22 +243,7 @@ timer_interrupt (struct intr_frame *args UNUSED)
     }
     break;
   }
-  thread_tick ();
-
-  /* MLFQ */
-
-  if (thread_mlfqs){
-      mlfqs_inc_recent_cpu();
-      if (ticks % TIMER_FREQ == 0){
-        update_mlfqs_values();
-    }
-    else if (ticks % 4 == 0){
-        update_mlfqs_priority(thread_current());
-    }
-  }
-
 }
-
 
 /* Returns true if LOOPS iterations waits for more than one timer
    tick, otherwise false. */

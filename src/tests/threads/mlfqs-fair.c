@@ -113,6 +113,7 @@ load_thread (void *ti_)
   int64_t last_time = 0;
 
   thread_set_nice (ti->nice);
+  msg("Thread: %s has nice value: %d and priority: %d \n", thread_current()->name, thread_current()->nice, thread_current()->priority);
   timer_sleep (sleep_time - timer_elapsed (ti->start_time));
   while (timer_elapsed (ti->start_time) < spin_time) 
     {
